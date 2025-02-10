@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Union
 from pydantic import BaseModel
 from huggingface_hub import snapshot_download
 import zipfile

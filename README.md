@@ -12,17 +12,57 @@ OCEAN is a novel framework for online root cause analysis in microservice system
 
 ## Installation
 
+### Prerequisites
+
+- Python 3.8 or higher
+- Git
+- Git LFS (will be installed by setup script if missing)
+
+### Quick Setup
+
+The easiest way to get started is to use our setup script:
+
+```bash
+# Clone the repository
+git clone https://github.com/navneet-mkr/OCEAN
+cd ocean
+
+# On Unix/Mac:
+chmod +x setup.sh
+./setup.sh
+
+# On Windows:
+setup.bat
+```
+
+The setup script will:
+1. Check and install prerequisites (including Git LFS)
+2. Create a virtual environment
+3. Install all dependencies
+4. Configure Hugging Face authentication
+5. Download and prepare datasets
+
+### Manual Setup
+
+If you prefer to set things up manually:
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/ocean.git
 cd ocean
 
-# Create and activate virtual environment (optional but recommended)
+# Create and activate virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Install Git LFS
+git lfs install
+
+# Login to Hugging Face
+huggingface-cli login
 ```
 
 ## Project Structure
@@ -52,12 +92,19 @@ ocean/
 The OCEAN model uses three real-world microservice datasets:
 
 1. **Product Review Dataset** (4 system faults)
-   - Microservice system for online product reviews
-   - Available at: https://lemma-rca.github.io/docs/data.html
-   - Features:
-     - System metrics: CPU, memory, latency, request rate
-     - System logs: Log templates with severity levels
-     - KPIs: Response time and error rate
+   - Option 1: Automatic download from Hugging Face Hub (Recommended)
+     ```bash
+     # Ensure you've installed Git LFS and logged into Hugging Face first
+     python scripts/prepare_data.py --dataset product_review
+     ```
+     This will automatically download and extract the dataset from [Lemma-RCA-NEC/Product_Review_Original](https://huggingface.co/datasets/Lemma-RCA-NEC/Product_Review_Original)
+
+   - Option 2: Manual download
+     If automatic download fails:
+     1. Visit https://lemma-rca.github.io/docs/data.html
+     2. Fill out the form to request access
+     3. Download and extract the data
+     4. Format according to OCEAN requirements
 
 2. **Online Boutique Dataset** (5 system faults)
    - Google Cloud microservice demo for e-commerce
