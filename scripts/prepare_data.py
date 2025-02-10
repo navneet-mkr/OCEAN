@@ -1,15 +1,21 @@
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = str(Path(__file__).parent.parent.absolute())
+sys.path.append(project_root)
+
 import argparse
 import requests
 import pandas as pd
 import numpy as np
-from pathlib import Path
 import logging
 import zipfile
 import tarfile
 from typing import List
 from pydantic import BaseModel, Field
 
-from config import ExperimentConfig
+from config import ExperimentConfig, ModelConfig, DataConfig, TrainingConfig, PathConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,20 +32,11 @@ class DatasetConfig(BaseModel):
 class DatasetPreparation:
     """
     Prepares datasets used in the OCEAN paper:
-    1. AIOps Challenge Dataset (KPI anomaly detection)
-    2. Azure Public Dataset (Cloud service monitoring)
-    3. Alibaba Cluster Trace (Container monitoring)
+    1. Azure Public Dataset (Cloud service monitoring)
+    2. Alibaba Cluster Trace (Container monitoring)
     """
     
     DATASET_CONFIGS = {
-        'aiops': DatasetConfig(
-            name='aiops',
-            url="https://github.com/NetManAIOps/KPI-Anomaly-Detection/raw/master/data/kpi_data.csv",
-            file_type='csv',
-            metrics_columns=['value'],
-            log_columns=[],
-            kpi_threshold=0.5
-        ),
         'azure': DatasetConfig(
             name='azure',
             url="https://azurecloudpublicdataset2.blob.core.windows.net/azurepublicdataset/trace_data.zip",
@@ -107,41 +104,12 @@ class DatasetPreparation:
                 tar.extractall(dataset_dir)
                 
         # Process dataset based on type
-        if dataset_name == 'aiops':
-            self._prepare_aiops(dataset_dir, dataset_config)
-        elif dataset_name == 'azure':
+        if dataset_name == 'azure':
             self._prepare_azure(dataset_dir, dataset_config)
         elif dataset_name == 'alibaba':
             self._prepare_alibaba(dataset_dir, dataset_config)
             
         logger.info(f"{dataset_name} dataset preparation completed")
-        
-    def _prepare_aiops(self, dataset_dir: Path, config: DatasetConfig) -> None:
-        """Prepare AIOps dataset"""
-        df = pd.read_csv(dataset_dir / "raw_data.csv")
-        
-        # Split into metrics, logs, and KPI
-        metrics_df = pd.DataFrame({
-            'timestamp': df['timestamp'],
-            'entity_id': df['KPI ID'],
-            'value': df['value']
-        })
-        
-        # Create dummy logs (since original dataset doesn't have logs)
-        logs_df = pd.DataFrame({
-            'timestamp': df['timestamp'],
-            'entity_id': df['KPI ID'],
-            'message': 'System status normal',
-            'level': 'INFO'
-        })
-        
-        # Create KPI values (using anomaly labels as KPI)
-        kpi_df = pd.DataFrame({
-            'timestamp': df['timestamp'],
-            'value': df['label']
-        })
-        
-        self._save_processed_data(dataset_dir, metrics_df, logs_df, kpi_df, df)
         
     def _prepare_azure(self, dataset_dir: Path, config: DatasetConfig) -> None:
         """Prepare Azure dataset"""
@@ -235,12 +203,55 @@ def main():
     parser = argparse.ArgumentParser(description='Prepare datasets for OCEAN experiments')
     parser.add_argument('--config', type=str, default='configs/default.yaml',
                       help='Path to configuration file')
-    parser.add_argument('--dataset', type=str, choices=['aiops', 'azure', 'alibaba', 'all'],
+    parser.add_argument('--data_dir', type=str, default='data',
+                      help='Directory to store the datasets')
+    parser.add_argument('--dataset', type=str, choices=['azure', 'alibaba', 'all'],
                       default='all', help='Dataset to prepare')
     args = parser.parse_args()
     
-    # Load configuration
-    config = ExperimentConfig.from_yaml(args.config)
+    # Create basic config
+    config = ExperimentConfig(
+        model=ModelConfig(
+            n_entities=10,  # These will be updated during training
+            n_metrics=5,    # based on actual dataset
+            n_logs=3,       # characteristics
+            hidden_dim=64,
+            n_temporal_layers=2,
+            temperature=0.1,
+            dropout=0.1,
+            beta=0.5,
+            restart_prob=0.3,
+            top_k=5,
+            rbo_threshold=0.9,
+            lambda_temporal=1.0,
+            lambda_sparsity=0.1,
+            lambda_acyclicity=1.0
+        ),
+        data=DataConfig(
+            window_size=100,
+            stride=10,
+            normalize=True,
+            outlier_threshold=3.0,
+            max_features=100
+        ),
+        training=TrainingConfig(
+            num_epochs=100,
+            batch_size=32,
+            learning_rate=0.001,
+            device="cuda",
+            eval_interval=1,
+            save_interval=5
+        ),
+        paths=PathConfig(
+            data_dir=Path(args.data_dir),
+            output_dir=Path("experiments")
+        ),
+        datasets=["azure", "alibaba"]
+    )
+    
+    # Override data directory if specified
+    if args.data_dir:
+        config.paths.data_dir = Path(args.data_dir)
     
     # Initialize data preparation
     data_prep = DatasetPreparation(config)
