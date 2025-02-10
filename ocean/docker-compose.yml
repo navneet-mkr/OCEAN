@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  ocean:
+    build: .
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./experiments:/app/experiments
+      - ./logs:/app/logs
+    environment:
+      - OCEAN_DEVICE=cuda
+      - OCEAN_LOG_LEVEL=DEBUG
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: ocean-train
+
+  prometheus:
+    image: prom/prometheus:v2.30.3
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:8.2.2
+    volumes:
+      - ./monitoring/grafana:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus 

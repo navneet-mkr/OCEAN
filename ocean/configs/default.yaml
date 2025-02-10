@@ -1,0 +1,36 @@
+model:
+  hidden_dim: 64
+  n_temporal_layers: 2
+  temperature: 0.1
+  dropout: 0.1
+  beta: 0.5
+  restart_prob: 0.3
+  top_k: 5
+  rbo_threshold: 0.9
+  lambda_temporal: 1.0
+  lambda_sparsity: 0.1
+  lambda_acyclicity: 1.0
+
+data:
+  window_size: 100
+  stride: 10
+  normalize: true
+  outlier_threshold: 3.0
+  max_features: 100
+
+training:
+  num_epochs: 100
+  batch_size: 32
+  learning_rate: 0.001
+  device: cuda
+  eval_interval: 1
+  save_interval: 5
+
+paths:
+  data_dir: data
+  output_dir: experiments
+
+datasets:
+  - aiops
+  - azure
+  - alibaba 
