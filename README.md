@@ -77,19 +77,22 @@ The OCEAN model uses three real-world microservice datasets:
 
 ### Download Datasets
 
-The datasets used in OCEAN require manual downloading and setup:
+The datasets used in OCEAN can be obtained in different ways:
 
-1. **Product Review Dataset**:
-   ```bash
-   python scripts/prepare_data.py --dataset product_review
-   ```
-   Then follow the instructions to:
-   1. Visit the dataset website
-   2. Fill out the form to request access
-   3. Download and extract the data
-   4. Format according to OCEAN requirements
+1. **Product Review Dataset** (4 system faults)
+   - Option 1: Automatic download from Hugging Face Hub
+     ```bash
+     python scripts/prepare_data.py --dataset product_review
+     ```
+     This will automatically download the dataset from [Lemma-RCA-NEC/Product_Review_Original](https://huggingface.co/datasets/Lemma-RCA-NEC/Product_Review_Original)
 
-2. **Online Boutique Dataset**:
+   - Option 2: Manual download
+     1. Visit https://lemma-rca.github.io/docs/data.html
+     2. Fill out the form to request access
+     3. Download and extract the data
+     4. Format according to OCEAN requirements
+
+2. **Online Boutique Dataset** (5 system faults)
    ```bash
    python scripts/prepare_data.py --dataset online_boutique
    ```
@@ -98,7 +101,7 @@ The datasets used in OCEAN require manual downloading and setup:
    2. Collecting metrics and logs during operation
    3. Processing the data into OCEAN format
 
-3. **Train Ticket Dataset**:
+3. **Train Ticket Dataset** (5 system faults)
    ```bash
    python scripts/prepare_data.py --dataset train_ticket
    ```

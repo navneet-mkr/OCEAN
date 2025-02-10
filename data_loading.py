@@ -5,9 +5,8 @@ from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
 from typing import Dict, List, Optional, Tuple, Union
 from pydantic import BaseModel
-from huggingface_hub import hf_hub_download
-import json
-import shutil
+from huggingface_hub import snapshot_download
+import zipfile
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -96,37 +95,56 @@ class RCADatasets:
             
         try:
             logger.info(f"Downloading {dataset_name} dataset from Hugging Face Hub...")
+            logger.info("Note: This dataset requires Hugging Face authentication.")
+            logger.info("Please run 'huggingface-cli login' if you haven't already.")
             
-            # Download metadata first
-            metadata_path = hf_hub_download(
-                repo_id=config.hf_repo_id,
-                filename="metadata.json",
-                repo_type="dataset"
-            )
+            # Try to download the entire repository snapshot
+            try:
+                # Download the entire repository
+                snapshot_path = snapshot_download(
+                    repo_id=config.hf_repo_id,
+                    repo_type="dataset",
+                    local_dir=dataset_dir,
+                    allow_patterns=["*.zip"],  # Only download zip files
+                    token=True  # Use token from huggingface-cli login
+                )
+                
+                logger.info(f"Successfully downloaded repository to {snapshot_path}")
+                
+                # Extract all zip files
+                for zip_file in dataset_dir.glob("*.zip"):
+                    try:
+                        logger.info(f"Extracting {zip_file}...")
+                        with zipfile.ZipFile(zip_file, 'r') as zip_ref:
+                            zip_ref.extractall(dataset_dir)
+                        # Optionally remove zip file after extraction
+                        zip_file.unlink()
+                    except Exception as e:
+                        logger.warning(f"Failed to extract {zip_file}: {str(e)}")
+                        continue
+                
+            except Exception as e:
+                logger.error(f"Failed to download repository: {str(e)}")
+                logger.info("Please ensure you:")
+                logger.info("1. Have installed huggingface_hub with LFS support: pip install huggingface_hub[cli]")
+                logger.info("2. Have logged in: huggingface-cli login")
+                logger.info("3. Have Git LFS installed: git lfs install")
+                return False
             
-            with open(metadata_path) as f:
-                metadata = json.load(f)
-                
-            # Create incident directories and download data files
-            for incident in metadata['incidents']:
-                incident_dir = dataset_dir / f"incident_{incident['id']}"
-                incident_dir.mkdir(parents=True, exist_ok=True)
-                
-                # Download required files for each incident
-                for filename in ['metrics.npy', 'logs.npy', 'kpi.npy', 'root_cause.npy']:
-                    file_path = hf_hub_download(
-                        repo_id=config.hf_repo_id,
-                        filename=f"incident_{incident['id']}/{filename}",
-                        repo_type="dataset"
-                    )
-                    # Copy to our dataset directory
-                    shutil.copy2(file_path, incident_dir / filename)
+            # Check if we have any data
+            if not self.check_dataset_files(dataset_dir):
+                raise Exception("No valid data files found after extraction")
                     
-            logger.info(f"Successfully downloaded {dataset_name} dataset to {dataset_dir}")
+            logger.info(f"Successfully downloaded and extracted {dataset_name} dataset to {dataset_dir}")
             return True
             
         except Exception as e:
             logger.error(f"Failed to download dataset from Hugging Face Hub: {str(e)}")
+            logger.info("\nTo manually download the dataset:")
+            logger.info(f"1. Visit https://huggingface.co/datasets/{config.hf_repo_id}")
+            logger.info("2. Login to Hugging Face")
+            logger.info("3. Download the zip files")
+            logger.info(f"4. Extract them to: {dataset_dir}")
             return False
     
     def download_dataset(self, dataset_name: str) -> Path:
