@@ -3,38 +3,24 @@ import pandas as pd
 import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, List
+from typing import Optional
+from contextlib import asynccontextmanager
 
-from ocean.models.ocean import OCEAN
-from ocean.utils.data_loader import OCEANDataLoader
-from ocean.config.env import env
-from ocean.utils.logging import get_logger
+from ..models.ocean import OCEAN
+from ..utils.data_loader import OCEANDataLoader
+from ..config.env import env
+from ..utils.logging import get_logger
 from .schemas import InferenceRequest, InferenceResponse, RootCause
 
 logger = get_logger(__name__)
 
-app = FastAPI(
-    title="OCEAN RCA API",
-    description="API for Online Multi-modal Root Cause Analysis",
-    version="1.0.0",
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Global model instance
-model: OCEAN = None
-data_loader: OCEANDataLoader = None
+model: Optional[OCEAN] = None
+data_loader: Optional[OCEANDataLoader] = None
 
-@app.on_event("startup")
-async def load_model():
-    """Load model on startup"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     global model, data_loader
     try:
         # Initialize data loader
@@ -63,12 +49,37 @@ async def load_model():
     except Exception as e:
         logger.error(f"Failed to load model: {str(e)}")
         raise
+    yield
+    # Shutdown
+    # Add cleanup code here if needed
+
+app = FastAPI(
+    title="OCEAN RCA API",
+    description="API for Online Multi-modal Root Cause Analysis",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/predict", response_model=InferenceResponse)
 async def predict(request: InferenceRequest):
     """
     Perform online root cause analysis
     """
+    if model is None or data_loader is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Model or data loader not initialized"
+        )
+        
     try:
         # Convert request data to DataFrames
         metrics_df = pd.DataFrame([

@@ -9,7 +9,7 @@ from typing import Dict
 from models.ocean import OCEAN
 from utils.data_loader import OCEANDataLoader
 from evaluate import evaluate_model
-from config import ExperimentConfig, ModelConfig
+from config.models import ExperimentConfig, ModelConfig
 
 logging.basicConfig(
     level=logging.INFO,
@@ -48,6 +48,15 @@ class ExperimentRunner:
     ) -> Dict[str, float]:
         """Train and evaluate model on specified dataset"""
         # Setup paths
+        if not self.config.paths:
+            raise ValueError("Paths not set in config")
+        if not self.config.paths.checkpoint_dir:
+            raise ValueError("Checkpoint directory not set in config")
+        if not self.config.paths.log_dir:
+            raise ValueError("Log directory not set in config")
+        if not self.config.paths.data_dir:
+            raise ValueError("Data directory not set in config")
+        
         checkpoint_path = self.config.paths.checkpoint_dir / f"{dataset_name}_best.pt"
         log_path = self.config.paths.log_dir / f"{dataset_name}_training.json"
         ground_truth_path = self.config.paths.data_dir / dataset_name / 'ground_truth.npy'
@@ -145,6 +154,12 @@ class ExperimentRunner:
     
     def run_all_experiments(self) -> None:
         """Run experiments on all datasets"""
+
+        # Setup paths
+        if not self.config.paths.results_dir:
+            raise ValueError("Results directory not set in config")
+        
+        
         results = {}
         
         for dataset in self.config.datasets:
