@@ -5,6 +5,9 @@ from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
 from typing import Dict, List, Optional, Tuple, Union
 from pydantic import BaseModel
+from huggingface_hub import hf_hub_download
+import json
+import shutil
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,6 +19,7 @@ class DatasetConfig(BaseModel):
     description: str
     n_faults: int
     data_format: Dict[str, List[str]]  # Expected columns/features for each data type
+    hf_repo_id: Optional[str] = None  # Hugging Face repository ID
 
 class RCADatasets:
     """
@@ -31,6 +35,7 @@ class RCADatasets:
             url='https://lemma-rca.github.io/docs/data.html',
             description='Microservice system for online product reviews',
             n_faults=4,
+            hf_repo_id='Lemma-RCA-NEC/Product_Review_Original',
             data_format={
                 'metrics': ['cpu_usage', 'memory_usage', 'latency', 'request_rate'],
                 'logs': ['log_template', 'timestamp', 'severity'],
@@ -65,26 +70,123 @@ class RCADatasets:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
     
+    def check_dataset_files(self, dataset_dir: Path) -> bool:
+        """
+        Check if the dataset directory contains actual data files in the expected format.
+        Returns True if the dataset appears to be properly downloaded and processed.
+        """
+        # Check for at least one incident directory
+        incident_dirs = [d for d in dataset_dir.iterdir() if d.is_dir() and d.name.startswith('incident_')]
+        if not incident_dirs:
+            return False
+            
+        # Check for required files in the first incident directory
+        required_files = ['metrics.npy', 'logs.npy', 'kpi.npy', 'root_cause.npy']
+        first_incident = incident_dirs[0]
+        return all((first_incident / f).exists() for f in required_files)
+    
+    def download_from_huggingface(self, dataset_name: str, dataset_dir: Path) -> bool:
+        """
+        Download dataset from Hugging Face Hub.
+        Returns True if successful, False otherwise.
+        """
+        config = self.DATASET_CONFIGS[dataset_name]
+        if not config.hf_repo_id:
+            return False
+            
+        try:
+            logger.info(f"Downloading {dataset_name} dataset from Hugging Face Hub...")
+            
+            # Download metadata first
+            metadata_path = hf_hub_download(
+                repo_id=config.hf_repo_id,
+                filename="metadata.json",
+                repo_type="dataset"
+            )
+            
+            with open(metadata_path) as f:
+                metadata = json.load(f)
+                
+            # Create incident directories and download data files
+            for incident in metadata['incidents']:
+                incident_dir = dataset_dir / f"incident_{incident['id']}"
+                incident_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Download required files for each incident
+                for filename in ['metrics.npy', 'logs.npy', 'kpi.npy', 'root_cause.npy']:
+                    file_path = hf_hub_download(
+                        repo_id=config.hf_repo_id,
+                        filename=f"incident_{incident['id']}/{filename}",
+                        repo_type="dataset"
+                    )
+                    # Copy to our dataset directory
+                    shutil.copy2(file_path, incident_dir / filename)
+                    
+            logger.info(f"Successfully downloaded {dataset_name} dataset to {dataset_dir}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to download dataset from Hugging Face Hub: {str(e)}")
+            return False
+    
     def download_dataset(self, dataset_name: str) -> Path:
         """
-        Download and extract dataset if not already present
-        Returns path to dataset directory
+        Download and prepare dataset. For Product Review dataset, attempts to download
+        from Hugging Face Hub first. For other datasets, provides manual instructions.
         """
         if dataset_name not in self.DATASET_CONFIGS:
             raise ValueError(f"Unknown dataset: {dataset_name}")
             
         config = self.DATASET_CONFIGS[dataset_name]
         dataset_dir = self.data_dir / dataset_name
-        
-        if dataset_dir.exists():
-            logger.info(f"Dataset {dataset_name} already exists at {dataset_dir}")
-            return dataset_dir
-            
-        logger.info(f"Dataset {dataset_name} not found. Please visit {config.url} "
-                   f"to download the dataset and place it in {dataset_dir}")
-        
-        # Create directory structure
         dataset_dir.mkdir(parents=True, exist_ok=True)
+        
+        if self.check_dataset_files(dataset_dir):
+            logger.info(f"Dataset {dataset_name} is already downloaded and processed at {dataset_dir}")
+            return dataset_dir
+        
+        # Try Hugging Face download for Product Review dataset
+        if dataset_name == 'product_review':
+            if self.download_from_huggingface(dataset_name, dataset_dir):
+                return dataset_dir
+                
+            logger.info("\nFailed to download from Hugging Face Hub. Falling back to manual instructions.")
+            
+        # Provide manual instructions if automatic download fails or for other datasets
+        logger.info(f"\nDataset {dataset_name} needs to be downloaded manually:")
+        
+        if dataset_name == 'product_review':
+            logger.info(
+                "Product Review Dataset Instructions:\n"
+                f"1. Visit {config.url}\n"
+                "2. Fill out the form to request dataset access\n"
+                "3. Download the dataset when received\n"
+                f"4. Extract the files to: {dataset_dir}\n"
+                "5. Ensure each incident is in its own directory with required files:\n"
+                "   - metrics.npy: (n_entities, n_metrics, time_steps)\n"
+                "   - logs.npy: (n_entities, n_logs, time_steps)\n"
+                "   - kpi.npy: (time_steps,)\n"
+                "   - root_cause.npy: Ground truth labels"
+            )
+        elif dataset_name == 'online_boutique':
+            logger.info(
+                "Online Boutique Dataset Instructions:\n"
+                f"1. Visit {config.url}\n"
+                "2. Follow instructions to set up the demo environment\n"
+                "3. Use provided scripts to collect metrics and logs\n"
+                f"4. Process and save data to: {dataset_dir}\n"
+                "5. Format data according to OCEAN requirements"
+            )
+        elif dataset_name == 'train_ticket':
+            logger.info(
+                "Train Ticket Dataset Instructions:\n"
+                f"1. Visit {config.url}\n"
+                "2. Clone and set up the Train Ticket system\n"
+                "3. Collect system metrics and logs during fault injection\n"
+                f"4. Process and save data to: {dataset_dir}\n"
+                "5. Format data according to OCEAN requirements"
+            )
+        
         return dataset_dir
 
 def generate_synthetic_data(

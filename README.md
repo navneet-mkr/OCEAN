@@ -77,49 +77,64 @@ The OCEAN model uses three real-world microservice datasets:
 
 ### Download Datasets
 
-```bash
-# Download all datasets
-python scripts/prepare_data.py --data_dir data --dataset all
+The datasets used in OCEAN require manual downloading and setup:
 
-# Or download a specific dataset
-python scripts/prepare_data.py --data_dir data --dataset product_review
-```
+1. **Product Review Dataset**:
+   ```bash
+   python scripts/prepare_data.py --dataset product_review
+   ```
+   Then follow the instructions to:
+   1. Visit the dataset website
+   2. Fill out the form to request access
+   3. Download and extract the data
+   4. Format according to OCEAN requirements
 
-The script will provide instructions for downloading each dataset, as they require manual download from their respective sources.
+2. **Online Boutique Dataset**:
+   ```bash
+   python scripts/prepare_data.py --dataset online_boutique
+   ```
+   This dataset requires:
+   1. Setting up the Google Cloud Online Boutique demo
+   2. Collecting metrics and logs during operation
+   3. Processing the data into OCEAN format
 
-### Data Format
+3. **Train Ticket Dataset**:
+   ```bash
+   python scripts/prepare_data.py --dataset train_ticket
+   ```
+   This dataset requires:
+   1. Setting up the Train Ticket microservice system
+   2. Running fault injection experiments
+   3. Collecting and processing the data
 
-Each dataset should be organized in the following structure:
+The `prepare_data.py` script will create the necessary directory structure and provide detailed instructions for each dataset.
+
+### Expected Data Format
+
+After downloading and processing, each dataset should be organized as follows:
 ```
 data/
 ├── product_review/
-│   ├── incident_1/
-│   │   ├── metrics.npy  # Shape: (n_entities, n_metrics, time_steps)
-│   │   ├── logs.npy     # Shape: (n_entities, n_logs, time_steps)
-│   │   ├── kpi.npy      # Shape: (time_steps,)
-│   │   └── root_cause.npy
+│   ├── incident_1/           # Each incident in its own directory
+│   │   ├── metrics.npy      # Shape: (n_entities, n_metrics, time_steps)
+│   │   ├── logs.npy         # Shape: (n_entities, n_logs, time_steps)
+│   │   ├── kpi.npy          # Shape: (time_steps,)
+│   │   └── root_cause.npy   # Ground truth labels
 │   ├── incident_2/
 │   └── ...
-├── online_boutique/
-└── train_ticket/
+├── online_boutique/         # Similar structure for Online Boutique
+└── train_ticket/           # Similar structure for Train Ticket
 ```
 
-### Using the Data Loader
+For development without real data, you can use synthetic data generation:
 
 ```python
-from data_loading import RCADataset, create_dataloader
+from data_loading import RCADataset
 
-# Load real dataset
+# Use synthetic data
 dataset = RCADataset(
     data_dir="data",
-    dataset_name="product_review",
-    use_synthetic=False
-)
-
-# Or use synthetic data for development
-dataset = RCADataset(
-    data_dir="data",
-    dataset_name="product_review",
+    dataset_name="product_review",  # or any other dataset name
     use_synthetic=True,
     synthetic_config={
         'n_incidents': 100,
@@ -129,16 +144,6 @@ dataset = RCADataset(
         'time_steps': 100
     }
 )
-
-# Create data loader
-dataloader = create_dataloader(dataset, batch_size=32)
-
-# Iterate through batches
-for batch in dataloader:
-    metrics = batch['metrics']      # Shape: (batch_size, n_entities, n_metrics, time_steps)
-    logs = batch['logs']           # Shape: (batch_size, n_entities, n_logs, time_steps)
-    kpi = batch['kpi']            # Shape: (batch_size, time_steps)
-    root_cause = batch['root_cause']  # Shape: (batch_size,)
 ```
 
 ## Model Architecture
