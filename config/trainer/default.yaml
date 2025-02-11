@@ -1,0 +1,64 @@
+# PyTorch Lightning Trainer configs
+accelerator: auto
+devices: auto
+precision: 16-mixed  # or 32, bf16-mixed
+
+# Training
+max_epochs: 100
+min_epochs: 1
+max_steps: -1
+min_steps: null
+max_time: null
+
+# Validation
+val_check_interval: 1.0  # epochs
+check_val_every_n_epoch: 1
+limit_val_batches: 1.0
+enable_validation: true
+enable_model_summary: true
+
+# Checkpointing
+enable_checkpointing: true
+enable_progress_bar: true
+reload_dataloaders_every_n_epochs: 0
+
+# Early Stopping
+enable_early_stopping: true
+early_stopping:
+  monitor: val_loss
+  min_delta: 0.001
+  patience: 10
+  mode: min
+  strict: true
+  check_finite: true
+
+# Model Checkpoint
+model_checkpoint:
+  monitor: val_loss
+  save_top_k: 3
+  save_last: true
+  mode: min
+  every_n_epochs: 1
+  every_n_train_steps: null
+  save_on_train_epoch_end: true
+
+# Logging
+logger: true
+log_every_n_steps: 50
+
+# Debugging
+fast_dev_run: false
+overfit_batches: 0.0
+detect_anomaly: false
+
+# Profiling
+profiler: null  # or simple, advanced, pytorch
+
+# Distributed Training
+strategy: auto  # or ddp, deepspeed
+sync_batchnorm: false
+replace_sampler_ddp: true
+
+# Deterministic
+deterministic: false
+benchmark: true 

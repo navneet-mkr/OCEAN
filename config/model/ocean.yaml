@@ -1,0 +1,45 @@
+# Model architecture
+n_temporal_layers: 3
+hidden_dim: 128
+n_heads: 4
+dropout: 0.1
+activation: "gelu"
+
+# Contrastive Learning
+temperature: 0.1
+contrast_mode: "all"
+base_temperature: 0.07
+
+# Graph Neural Network
+gnn_layers: 2
+gnn_hidden_dim: 64
+edge_dim: 16
+
+# Root Cause Analysis
+restart_prob: 0.3
+top_k: 5
+threshold: 0.5
+
+# Training
+optimizer:
+  name: adamw
+  lr: 0.001
+  weight_decay: 0.0001
+  beta1: 0.9
+  beta2: 0.999
+
+scheduler:
+  name: cosine
+  warmup_epochs: 10
+  min_lr: 0.00001
+  patience: 5  # for ReduceLROnPlateau
+
+# Loss
+loss:
+  name: cross_entropy
+  label_smoothing: 0.1
+
+# Regularization
+regularization:
+  gradient_clip_val: 1.0
+  gradient_clip_algorithm: norm 

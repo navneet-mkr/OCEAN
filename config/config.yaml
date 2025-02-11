@@ -1,0 +1,48 @@
+defaults:
+  - _self_
+  - model: ocean
+  - trainer: default
+  - data: product_review
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+# Experiment configs
+experiment:
+  name: ${now:%Y-%m-%d_%H-%M-%S}
+  version: 0.1.0
+  seed: 42
+
+# Wandb configs
+wandb:
+  project: ocean
+  entity: ${oc.env:WANDB_ENTITY}
+  mode: online
+  tags: []
+  notes: ""
+
+# Training configs
+training:
+  max_epochs: 100
+  batch_size: 32
+  learning_rate: 0.001
+  patience: 10
+  gradient_clip_val: 1.0
+  log_interval: 10
+  eval_interval: 100
+
+# Paths
+paths:
+  data_dir: ${oc.env:DATA_DIR,data}
+  output_dir: ${hydra:runtime.output_dir}
+  log_dir: ${hydra:runtime.output_dir}/logs
+  checkpoint_dir: ${hydra:runtime.output_dir}/checkpoints
+
+# Hydra configs
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+  job:
+    chdir: true 

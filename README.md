@@ -9,6 +9,7 @@ OCEAN is a novel framework for online root cause analysis in microservice system
 - Integrates both system metrics and logs for better analysis
 - Performs online root cause analysis with streaming data
 - Uses contrastive learning for multi-modal feature fusion
+- Supports PyTorch Lightning for efficient training and experiment tracking
 
 ## Installation
 
@@ -224,73 +225,84 @@ OCEAN consists of four main components:
 
 ### Configuration
 
-The model can be configured using YAML files:
+The model can be configured through Hydra's configuration system or command-line overrides:
 
 ```yaml
-model:
-  n_entities: 10          # Number of system entities
-  n_metrics: 4           # Number of metric features
-  n_logs: 3             # Number of log features
-  hidden_dim: 64        # Hidden dimension size
-  n_temporal_layers: 2  # Number of temporal conv layers
-  temperature: 0.1      # Temperature for contrastive learning
-  dropout: 0.1         # Dropout rate
-  beta: 0.5           # Transition probability coefficient
-  restart_prob: 0.3   # Random walk restart probability
-  top_k: 5           # Number of top root causes to identify
-
-data:
-  window_size: 100    # Size of sliding windows
-  stride: 10         # Stride between windows
-  normalize: true    # Whether to normalize data
-  max_features: 100  # Maximum number of log features
+# config/config.yaml
+defaults:
+  - model: ocean
+  - trainer: default
+  - data: product_review
 
 training:
-  num_epochs: 100
+  max_epochs: 100
   batch_size: 32
   learning_rate: 0.001
-  device: cuda
+  num_workers: 4
+  gradient_clip_val: 1.0
 ```
 
 ### Training Process
 
-```python
-from models.ocean import OCEAN
-from data_loading import RCADataset, create_dataloader
+The model can be trained using PyTorch Lightning with Hydra configuration:
 
-# Initialize dataset
-dataset = RCADataset(data_dir="data", dataset_name="product_review")
-dataloader = create_dataloader(dataset, batch_size=32)
+```bash
+# Basic training with default config
+python train.py
+
+# Override training parameters
+python train.py training.batch_size=64 training.learning_rate=0.0001
+
+# Use a different dataset
+python train.py data=online_boutique
+
+# Train with synthetic data
+python train.py data.use_synthetic=true
+```
+
+For programmatic training:
+
+```python
+from models.ocean_module import OCEANModule
+from data_loading import OCEANDataModule
+import lightning as L
+
+# Initialize data module
+data_module = OCEANDataModule(
+    data_dir="data",
+    dataset_name="product_review",
+    batch_size=32,
+    num_workers=4
+)
 
 # Initialize model
-model = OCEAN(
-    n_entities=10,
-    n_metrics=4,
-    n_logs=3,
+model = OCEANModule(
+    n_entities=data_module.n_entities,
+    n_metrics=data_module.n_metrics,
+    n_logs=data_module.n_logs,
     hidden_dim=64
 )
 
-# Training loop
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-for epoch in range(num_epochs):
-    for batch in dataloader:
-        # Forward pass
-        metrics = batch['metrics'].to(device)
-        logs = batch['logs'].to(device)
-        kpi = batch['kpi'].to(device)
-        
-        loss = model.forward(
-            metrics=metrics,
-            logs=logs,
-            kpi=kpi,
-            is_training=True
-        )
-        
-        # Backward pass
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+# Initialize trainer
+trainer = L.Trainer(
+    max_epochs=100,
+    accelerator='auto',
+    devices=1,
+    gradient_clip_val=1.0
+)
+
+# Train model
+trainer.fit(model, data_module)
 ```
+
+The training process includes:
+- Automatic train/validation/test splitting
+- Model checkpointing based on validation loss
+- Early stopping to prevent overfitting
+- Progress tracking and metric logging
+- Multi-GPU support through PyTorch Lightning
+- WandB integration for experiment tracking
+- Hydra configuration management for experiments
 
 ## Evaluation
 
@@ -352,7 +364,6 @@ ranked_causes, scores = model.infer(
 top_k_causes = ranked_causes[:5]
 print(f"Top-5 potential root causes: {top_k_causes}")
 ```
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -367,3 +378,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+

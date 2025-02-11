@@ -2,11 +2,18 @@ import logging
 import numpy as np
 import torch
 from pathlib import Path
-from torch.utils.data import Dataset, DataLoader
-from typing import Dict, List, Optional, Union
+from torch.utils.data import Dataset, DataLoader, Subset
+from typing import Dict, List, Optional, Union, cast, Any
 from pydantic import BaseModel
 from huggingface_hub import snapshot_download
 import zipfile
+import lightning as L
+try:
+    import pytorch_lightning as pl
+    from pytorch_lightning.loggers import WandbLogger
+except ImportError:
+    import lightning.pytorch as pl
+    from lightning.pytorch.loggers import WandbLogger
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -347,3 +354,106 @@ def create_dataloader(
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available()
     ) 
+
+class OCEANDataModule(L.LightningDataModule):
+    """Lightning DataModule for OCEAN model training"""
+    
+    def __init__(
+        self,
+        data_dir: Union[str, Path],
+        dataset_name: str = "product_review",
+        batch_size: int = 32,
+        num_workers: int = 4,
+        use_synthetic: bool = False,
+        synthetic_config: Optional[Dict[str, Any]] = None,
+        train_val_split: float = 0.8,
+        seed: int = 42
+    ):
+        super().__init__()
+        self.data_dir = Path(data_dir)
+        self.dataset_name = dataset_name
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.use_synthetic = use_synthetic
+        self.synthetic_config = synthetic_config or {}
+        self.train_val_split = train_val_split
+        self.seed = seed
+        
+        # These will be set in setup()
+        self.train_dataset: Optional[Subset[RCADataset]] = None
+        self.val_dataset: Optional[Subset[RCADataset]] = None
+        self.test_dataset: Optional[RCADataset] = None
+        
+        # Get dataset config for dimensions
+        if not use_synthetic:
+            config = RCADatasets.DATASET_CONFIGS[dataset_name]
+            self.n_entities = config.n_faults
+            self.n_metrics = len(config.data_format['metrics'])
+            self.n_logs = len(config.data_format['logs'])
+        else:
+            self.n_entities = self.synthetic_config.get('n_entities', 10)
+            self.n_metrics = self.synthetic_config.get('n_metrics', 4)
+            self.n_logs = self.synthetic_config.get('n_logs', 3)
+    
+    def prepare_data(self):
+        """Download data if needed. This method is called only from a single GPU."""
+        if not self.use_synthetic:
+            RCADatasets(self.data_dir).download_dataset(self.dataset_name)
+    
+    def setup(self, stage: Optional[str] = None):
+        """Set up the datasets. This method is called on every GPU."""
+        if stage == "fit" or stage is None:
+            # Create full dataset
+            full_dataset = RCADataset(
+                data_dir=self.data_dir,
+                dataset_name=self.dataset_name,
+                use_synthetic=self.use_synthetic,
+                synthetic_config=self.synthetic_config
+            )
+            
+            # Split dataset
+            total_size = len(full_dataset)
+            train_size = int(total_size * self.train_val_split)
+            val_size = total_size - train_size
+            
+            # Use random split with seed for reproducibility
+            self.train_dataset, self.val_dataset = torch.utils.data.random_split(
+                full_dataset,
+                [train_size, val_size],
+                generator=torch.Generator().manual_seed(self.seed)
+            )
+        
+        if stage == "test" or stage is None:
+            self.test_dataset = RCADataset(
+                data_dir=self.data_dir,
+                dataset_name=self.dataset_name,
+                use_synthetic=self.use_synthetic,
+                synthetic_config=self.synthetic_config
+            )
+    
+    def train_dataloader(self) -> DataLoader:
+        assert self.train_dataset is not None
+        return create_dataloader(
+            cast(RCADataset, self.train_dataset),
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers
+        )
+    
+    def val_dataloader(self) -> DataLoader:
+        assert self.val_dataset is not None
+        return create_dataloader(
+            cast(RCADataset, self.val_dataset),
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers
+        )
+    
+    def test_dataloader(self) -> DataLoader:
+        assert self.test_dataset is not None
+        return create_dataloader(
+            self.test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers
+        ) 

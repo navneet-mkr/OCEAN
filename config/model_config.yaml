@@ -1,0 +1,79 @@
+model:
+  # Architecture
+  n_temporal_layers: 3
+  hidden_dim: 128
+  n_heads: 4
+  dropout: 0.1
+  activation: "gelu"
+  
+  # Contrastive Learning
+  temperature: 0.1
+  contrast_mode: "all"
+  base_temperature: 0.07
+  
+  # Graph Neural Network
+  gnn_layers: 2
+  gnn_hidden_dim: 64
+  edge_dim: 16
+  
+  # Root Cause Analysis
+  restart_prob: 0.3
+  top_k: 5
+  threshold: 0.5
+
+training:
+  # Basic Training
+  num_epochs: 100
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  
+  # Learning Rate Schedule
+  lr_scheduler: "cosine"
+  warmup_epochs: 10
+  min_lr: 0.00001
+  
+  # Early Stopping
+  patience: 10
+  min_delta: 0.001
+  
+  # Gradient Clipping
+  clip_grad_norm: 1.0
+  
+  # Mixed Precision
+  use_amp: true
+  
+  # Logging
+  log_interval: 10
+  eval_interval: 100
+
+data:
+  # Data Loading
+  num_workers: 4
+  prefetch_factor: 2
+  pin_memory: true
+  
+  # Preprocessing
+  window_size: 100
+  stride: 10
+  normalize: true
+  standardize: true
+  
+  # Augmentation
+  use_augmentation: true
+  noise_std: 0.01
+  mask_prob: 0.15
+  
+  # Feature Selection
+  max_log_features: 100
+  metric_aggregation: "mean"
+
+evaluation:
+  metrics:
+    - "precision@1"
+    - "precision@5"
+    - "map@3"
+    - "map@5"
+    - "mrr"
+  threshold: 0.5
+  save_predictions: true 
