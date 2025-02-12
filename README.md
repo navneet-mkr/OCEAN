@@ -18,6 +18,8 @@ OCEAN is a novel framework for online root cause analysis in microservice system
 - Python 3.8 or higher
 - Git
 - Git LFS (will be installed by setup script if missing)
+- Hydra (for configuration management)
+- Weights & Biases (for experiment tracking)
 
 ### Quick Setup
 
@@ -80,13 +82,32 @@ ocean/
 │   ├── attention.py          # Multi-factor attention mechanism
 │   ├── fusion.py            # Graph fusion with contrastive learning
 │   └── ocean.py             # Main OCEAN model
+├── config/                    # Hydra configuration files
+│   ├── config.yaml          # Main configuration
+│   ├── model/               # Model configurations
+│   ├── data/                # Dataset configurations
+│   └── trainer/             # Training configurations
 ├── scripts/                   # Utility scripts
 │   ├── prepare_data.py       # Dataset preparation
 │   └── run_experiments.py    # Experiment runner
 ├── data_loading.py           # Data loading utilities
 ├── requirements.txt          # Project dependencies
+├── .env.example              # Environment variable template
 └── README.md                # Project documentation
 ```
+
+### Environment Setup
+
+After installation, copy the environment template and set your variables:
+
+```bash
+cp .env.example .env
+```
+
+Key environment variables:
+- `WANDB_ENTITY`: Your Weights & Biases team/username
+- `DATA_DIR`: Base directory for datasets (default: 'data')
+- `OUTPUT_DIR`: Directory for experiment outputs (default: 'outputs')
 
 ## Data Preparation
 
